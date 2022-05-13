@@ -1,1 +1,1 @@
-# YBJ_dynamics
+# pyYBJ
