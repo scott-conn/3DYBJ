@@ -1,4 +1,6 @@
-#code to solve 3D YBJ equation
+#code to solve 3D YBJ equation coupled with QG evolution
+#QQ implementation is based on the QG example from (Burns, Keaton J., et al. "Dedalus: A flexible framework for numerical simulations with spectral methods." Physical Review Research 2.2 (2020): 023068.)
+#https://github.com/DedalusProject/methods_paper_examples/tree/6f08b60361b721c20d0cf044f9b611104b4b1491/quasigeostrophic_flow
 #Ls = vector containing length of domain in (x,y,z)
 #ns = vector containing number of grid points in (x,y,z)
 #f_0 = Coriolis parameter
@@ -25,7 +27,103 @@ logger = logging.getLogger(__name__)
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
-def run_sim(Ls,ns,f_0,Hm,event_file,Nt,Nw,time_step):
+if MPI.COMM_WORLD.size > (Nx // 2):
+    mesh = [(Nx // 2), MPI.COMM_WORLD.size // (Nx // 2)]
+else:
+    mesh = None
+    
+def spin_up_QG(Ls,ns,init_file,event_file,Nt,time_step,f_0)
+    Lx, Ly, Lz = Ls                                                                     #length of each dimension
+    nx, ny, nz = ns                                                                     #number of grid cells in each dimension
+    Tx, Ty, Tz = (Lx/nx,Ly/ny,Lz/nz)
+    x_basis = de.Fourier('x', nx, interval=(-Lx/2, Lx/2), dealias=3/2)                  #create x-dimension
+    y_basis = de.Fourier('y', ny, interval=(-Ly/2, Ly/2), dealias=3/2)                  #create y-dimension 
+    z_basis = de.Chebyshev('z', nz, interval=(-Lz, 0), dealias=3/2)                     #create z-dimension
+
+    #Stratification parameter
+    N2 = domain.new_field()
+    N2.meta['x','y']['constant'] = True
+    hf = h5py.File(event_file, 'r')                                                     #open file containing simulation data
+    N2_data = hf.get('N2')
+    N2['g'] = N2_data
+    close(hf)
+    
+    problem = de.IVP(domain, variables=['psi','w'],ncc_cutoff=1e-8)
+    problem.meta[:]['z']['dirichlet'] = True
+
+    problem.substitutions['L(a)'] = "d(a,x=2) + d(a,y=2)"
+    problem.substitutions['HD(a)'] = "L(L(L(L(a))))"   
+    problem.substitutions["J(f,g)"] = "dx(f)*dy(g)-dy(f)*dx(g)"
+    problem.substitutions['q'] = "L(psi) + dz(f**2*dz(psi)/N2)"
+    problem.substitutions['b'] = "f*dz(psi)"
+    
+    problem.parameters['f'] = f_0
+    problem.parameters['N2'] = N2
+    
+    problem.add_equation("dt(q) + nu*HD(q)  = -J(psi,q)")
+    problem.add_equation("dt(b) + N2*w  + kappa*HD(b) = -J(psi,b)")
+    problem.add_bc(" left(w) = 0", condition="(nx != 0)  or (ny != 0)")
+    problem.add_bc("right(w) = 0", condition="(nx != 0)  or (ny != 0)")
+    problem.add_bc("left(psi) = 0", condition="(nx == 0) and (ny == 0)")
+    problem.add_bc("right(psi) = 0", condition="(nx == 0) and (ny == 0)")
+    
+    psi_init, b_init, Q_init = domain.new_fields(3)
+    for g in [psi_init, b_init, Q_init]:
+        g.set_scales(domain.dealias)
+
+    slices = domain.dist.grid_layout.slices(scales=1)                                           #take right part of psi array when in parallel
+    hf = h5py.File(init_file, 'r')  
+    psi_data = hf.get('psi')                                                                   #extract psi data
+    psi_init['g'] = psi_data[:,:,:][slices]
+    hf.close()
+    
+    # Need to solve for W_init using dt(P) --> Pt_init as a slack variable.
+    init_problem = de.LBVP(domain, variables=['Pt','W'])
+    init_problem.meta[:]['z']['dirichlet'] = True
+
+    init_problem.substitutions = problem.substitutions
+    init_problem.parameters    = problem.parameters
+
+    init_problem.parameters['P'] = P_init
+
+    init_problem.add_equation(" L(Pt) =  nu*HD(q)    - J(psi,q)")
+    init_problem.add_equation("f*dz(Pt) + N2*w  = J(psi,b) - kappa*HD(b)")
+
+    init_problem.add_bc(" left(W) =   0", condition="(nx != 0)  or (ny != 0)")
+    init_problem.add_bc("right(W)  = 0", condition="(nx != 0)  or (ny != 0)")
+    init_problem.add_bc("left(Pt) = 0", condition="(nx == 0) and (ny == 0)")
+    init_problem.add_bc("right(Pt) = 0", condition="(nx == 0) and (ny == 0)")
+
+    # Init solver
+    init_solver = init_problem.build_solver()
+    init_solver.solve()
+
+    psi = solver.state['P']
+    w = solver.state['W']
+    for g in [psi,w]: g.set_scales(domain.dealias)
+
+    psi['g'] = psi_init['g']
+
+    init_solver.state['W'].set_scales(domain.dealias)
+    w['g'] = init_solver.state['w']['g']
+               
+    solver.stop_iteration = np.inf
+    solver.stop_sim_time  = 
+    solver.stop_wall_time = np.inf           
+               
+    logger.info('Starting loop')
+    start_time = time.time()
+    dt = time_step
+    while solver.ok:
+        solver.step(dt)                                                             #advance simulation
+        if solver.iteration % 100 == 0:
+            logger.info('Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt))
+               
+               
+               
+    return solver     
+               
+def run_sim(Ls,ns,f_0,Hm,solver,event_file,Nt,Nw,time_step):
     
     Lx, Ly, Lz = Ls                                                                     #length of each dimension
     nx, ny, nz = ns                                                                     #number of grid cells in each dimension
@@ -34,16 +132,18 @@ def run_sim(Ls,ns,f_0,Hm,event_file,Nt,Nw,time_step):
     y_basis = de.Fourier('y', ny, interval=(-Ly/2, Ly/2), dealias=3/2)                  #create y-dimension 
     z_basis = de.Chebyshev('z', nz, interval=(-Lz, 0), dealias=3/2)                     #create z-dimension
 
-    #create problem with M, Mz, Mzz and psi as the variables
+    #create problem with M, Mz, Mzz, psi and w as the variables
     domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype=np.complex128)
-    problem = de.IVP(domain, variables=['M','Mz','Mzz','psi'],max_ncc_terms=10)
+    problem = de.IVP(domain, variables=['M','Mz','Mzz','psi','w'],max_ncc_terms=10)
 
     #problem parameters
     z = domain.grid(2)
     T = 2*np.pi/f_0                                                                     #inertial period (s)
     a = 2                                                                               #parameter governing sharpness of forcing profile
     M0 = 0+0j                                                                           #start simulation with no NIWs, boundary term on is zero at top
-    nu = 3e6                                                                            #hyperdiffusivity parameter (m^4/s)
+    nuM = 3e6                                                                           #hyperdiffusivity parameter for NIWs (m^4/s)
+    nuq = 3e6                                                                           #hyperdiffusivity parameter for q
+    kappa = 3e6                                                                         #hyperdiffusivity parameter for b
     dt = time_step*T                                                                    #timestep (s)
     psi_update = 24*60*60//dt                                                           #number of timesteps per day (number of timesteps after which update psi)
     
@@ -149,6 +249,7 @@ def run_sim(Ls,ns,f_0,Hm,event_file,Nt,Nw,time_step):
 
     logger.info('Starting loop')
     start_time = time.time()
+    dt = time_step
     while solver.ok:
         solver.step(dt)                                                             #advance simulation
         M0 = M0 + dt*wind_data[solver.iteration-1]                                  #solve ODE for top b.c.
