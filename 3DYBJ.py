@@ -189,7 +189,7 @@ def run_sim(Ls,ns,p,solver_QG,strat_file,wind_file):
     problem.substitutions['L(a)'] = "d(a,x=2) + d(a,y=2)"
     problem.substitutions['HD(a)'] = "L(L(L(L(a))))"   
     problem.substitutions["J(f,g)"] = "dx(f)*dy(g)-dy(f)*dx(g)"
-    problem.substitutions['q'] = "L(psi) + dz(f**2*dz(psi)/N2) + 1j*J(conj(Mz),Mz)/2f + L(mag2(Mz))/4/f"
+    problem.substitutions['q'] = "L(psi) + dz(f**2*dz(psi)/N2) + 1j*J(conj(Mz),Mz)/2/f + L(mag2(Mz))/4/f"
     problem.substitutions['b'] = "f*dz(psi)"
     
     #equations and b.c.'s
