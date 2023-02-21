@@ -78,17 +78,13 @@ def spin_up_QG(Ls,ns,init_file,event_file,Nt,time_step,f_0)
     hf.close()
     
     # Need to solve for W_init using dt(P) --> Pt_init as a slack variable.
-    init_problem = de.LBVP(domain, variables=['Pt','W'])
+    init_problem = de.LBVP(domain, variables=['Pt','w'])
     init_problem.meta[:]['z']['dirichlet'] = True
-
     init_problem.substitutions = problem.substitutions
     init_problem.parameters    = problem.parameters
-
     init_problem.parameters['P'] = P_init
-
     init_problem.add_equation(" L(Pt) =  nu*HD(q)    - J(psi,q)")
     init_problem.add_equation("f*dz(Pt) + N2*w  = J(psi,b) - kappa*HD(b)")
-
     init_problem.add_bc(" left(W) =   0", condition="(nx != 0)  or (ny != 0)")
     init_problem.add_bc("right(W)  = 0", condition="(nx != 0)  or (ny != 0)")
     init_problem.add_bc("left(Pt) = 0", condition="(nx == 0) and (ny == 0)")
@@ -98,17 +94,17 @@ def spin_up_QG(Ls,ns,init_file,event_file,Nt,time_step,f_0)
     init_solver = init_problem.build_solver()
     init_solver.solve()
 
-    psi = solver.state['P']
-    w = solver.state['W']
+    psi = solver.state['psi']
+    w = solver.state['w']
     for g in [psi,w]: g.set_scales(domain.dealias)
 
     psi['g'] = psi_init['g']
 
-    init_solver.state['W'].set_scales(domain.dealias)
+    init_solver.state['w'].set_scales(domain.dealias)
     w['g'] = init_solver.state['w']['g']
                
-    solver.stop_iteration = np.inf
-    solver.stop_sim_time  = 
+    solver.stop_iteration = Nt
+    solver.stop_sim_time  = np.inf
     solver.stop_wall_time = np.inf           
                
     logger.info('Starting loop')
@@ -212,18 +208,41 @@ def run_sim(Ls,ns,f_0,Hm,solver,event_file,Nt,Nw,time_step):
     M = solver.state['M']
     Mz = solver.state['Mz']
     Mzz = solver.state['Mzz']
-    
-    psi = solver.state['psi']
-    slices = domain.dist.grid_layout.slices(scales=1)                                           #take right part of psi array when in parallel
-    psi_data1 = hf.get('psi')                                                                   #extract psi data
-    psi['g'] = psi_data1[:,:,:,0][slices]
-    
+    M['g'] = 0+0j
     Mz['g'] = 0+0j
     Mzz['g'] = 0+0j
+    
+    psi_init = solver.state['psi']
+    slices = domain.dist.grid_layout.slices(scales=1)                                           #take right part of psi array when in parallel
+    hf = h5py.File(init_file, 'r')  
+    psi_data = hf.get('psi')                                                                    #extract psi data
+    psi_init['g'] = psi_data[:,:,:][slices]
+    hf.close()
+    
+    # Need to solve for W_init using dt(P) --> Pt_init as a slack variable.
+    init_problem = de.LBVP(domain, variables=['Pt','w'])
+    init_problem.meta[:]['z']['dirichlet'] = True
+    init_problem.substitutions = problem.substitutions
+    init_problem.parameters    = problem.parameters
+    init_problem.parameters['P'] = P_init
+    init_problem.add_equation(" L(Pt) =  nu*HD(q)    - J(psi,q)")
+    init_problem.add_equation("f*dz(Pt) + N2*w  = J(psi,b) - kappa*HD(b)")
+    init_problem.add_bc(" left(W) =   0", condition="(nx != 0)  or (ny != 0)")
+    init_problem.add_bc("right(W)  = 0", condition="(nx != 0)  or (ny != 0)")
+    init_problem.add_bc("left(Pt) = 0", condition="(nx == 0) and (ny == 0)")
+    init_problem.add_bc("right(Pt) = 0", condition="(nx == 0) and (ny == 0)")
 
-    #using very small timestep, step forward and hence invert for A and dA/dz
-    dt = 1e-10
-    solver.step(dt)
+    # Init solver
+    init_solver = init_problem.build_solver()
+    init_solver.solve()
+    
+    psi = solver.state['psi']
+    w = solver.state['w']
+    for g in [psi,w]: 
+        g.set_scales(domain.dealias)
+    psi['g'] = psi_init['g']
+    init_solver.state['w'].set_scales(domain.dealias)
+    w['g'] = init_solver.state['w']['g']
 
     #set up output files
     
