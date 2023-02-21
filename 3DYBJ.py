@@ -178,7 +178,7 @@ def run_sim(Ls,ns,p,solver_QG,strat_file,wind_file):
     problem.parameters['Lz'] = Lz
     problem.parameters['a'] = a
     problem.parameters['M0'] = M0
-    problem.parameters['N2'] = ncc
+    problem.parameters['N2'] = N2
     problem.parameters['W'] = wind_data[0]
 
     #substitutions
