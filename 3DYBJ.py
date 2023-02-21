@@ -52,7 +52,7 @@ def spin_up_QG(Ls,ns,p,init_file,strat_file)
     hf = h5py.File(strat_file, 'r')                                                    
     N2_data = hf.get('N2')
     N2['g'] = N2_data
-    close(hf)
+    hf.close 
     
     #create IVP with the streamfunction (psi) and vertical velocity (w) as parameters
     problem = de.IVP(domain, variables=['psi','w'],ncc_cutoff=1e-8)
