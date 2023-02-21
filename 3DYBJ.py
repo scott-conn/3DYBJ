@@ -82,7 +82,7 @@ def spin_up_QG(Ls,ns,init_file,event_file,Nt,time_step,f_0)
     init_problem.meta[:]['z']['dirichlet'] = True
     init_problem.substitutions = problem.substitutions
     init_problem.parameters    = problem.parameters
-    init_problem.parameters['P'] = P_init
+    init_problem.parameters['psi'] = psi_init
     init_problem.add_equation(" L(Pt) =  nu*HD(q)    - J(psi,q)")
     init_problem.add_equation("f*dz(Pt) + N2*w  = J(psi,b) - kappa*HD(b)")
     init_problem.add_bc(" left(W) =   0", condition="(nx != 0)  or (ny != 0)")
@@ -224,7 +224,7 @@ def run_sim(Ls,ns,f_0,Hm,solver,event_file,Nt,Nw,time_step):
     init_problem.meta[:]['z']['dirichlet'] = True
     init_problem.substitutions = problem.substitutions
     init_problem.parameters    = problem.parameters
-    init_problem.parameters['P'] = P_init
+    init_problem.parameters['psi'] = psi_init
     init_problem.add_equation(" L(Pt) =  nu*HD(q)    - J(psi,q)")
     init_problem.add_equation("f*dz(Pt) + N2*w  = J(psi,b) - kappa*HD(b)")
     init_problem.add_bc(" left(W) =   0", condition="(nx != 0)  or (ny != 0)")
