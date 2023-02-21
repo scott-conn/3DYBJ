@@ -68,6 +68,25 @@ def run_sim(Ls,ns,f_0,Hm,event_file,Nt,Nw,time_step):
     problem.parameters['M0'] = M0
     problem.parameters['N2'] = ncc
     problem.parameters['W'] = wind_data[0]
+    
+    #substitutions
+    problem.substitutions["mag2(f)"] = "f * conj(f)"
+    problem.substitutions["forc_z"] = "a*(1+tanh(a*z/Hm+a))/Hm/(a+log(2*cosh(a)))"
+    problem.substitutions["forc_zz"] = "a**2/(cosh(a*(z/Hm+1)))**2/Hm**2/(a+log(2*cosh(a)))"
+    problem.substitutions["real(f)"] = "(f + conj(f))/2"
+    problem.substitutions['L(a)'] = "d(a,x=2) + d(a,y=2)"
+    problem.substitutions['HD(a)'] = "L(L(L(L(a))))"   
+    problem.substitutions["J(f,g)"] = "dx(f)*dy(g)-dy(f)*dx(g)"
+    problem.substitutions['q'] = "L(psi) + dz(f**2*dz(psi)/N2) + 1j*J(conj(Mz),Mz)/2f + L(mag2(Mz))/4/f"
+    problem.substitutions['b'] = "f*dz(psi)"
+    
+    #equations and b.c.'s
+    problem.add_equation("dt(Mzz) + 1j*N2*L(M)/2/f + nu*HD(Mzz) = -dz(J(psi,Mz)) -1j*dz(L(psi)*Mz/2) + W*forc_zz") 
+    problem.add_equation("Mzz - dz(Mz) = 0")
+    problem.add_equation("Mz - dz(M) = 0")
+    problem.add_equation("dt(psi) = 0")
+    problem.add_bc("right(M) = M_0")
+    problem.add_bc("left(M) = 0")
 
     #substitutions
     problem.substitutions["mag2(f)"] = "f * conj(f)"
