@@ -112,10 +112,9 @@ def spin_up_QG(Ls,ns,init_file,event_file,Nt,time_step,f_0)
     dt = time_step
     while solver.ok:
         solver.step(dt)                                                             #advance simulation
-        if solver.iteration % 100 == 0:
+        if (solver.iteration-1) % 1000 == 0:
+            for field in solver.state.fields: field.require_grid_space()
             logger.info('Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt))
-               
-               
                
     return solver     
                
@@ -260,7 +259,9 @@ def run_sim(Ls,ns,f_0,Hm,solver_QG,event_file,Nt,Nw,time_step):
             psi_data = psi_data1[:,:,:,index]
             slices = domain.dist.grid_layout.slices(scales=1)
             psi['g'] = psi_data[slices]
-        if solver.iteration % 100 == 0:
+            
+        if (solver.iteration-1) % 1000 == 0:
+            for field in solver.state.fields: field.require_grid_space()
             logger.info('Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt))
     hf.close()
 
