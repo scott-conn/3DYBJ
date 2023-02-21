@@ -162,10 +162,10 @@ def run_sim(Ls,ns,p,solver_QG,strat_file,wind_file):
     hf = h5py.File(strat_file, 'r')                                                    
     N2_data = hf.get('N2')
     N2['g'] = N2_data
-    close(hf)
+    hf.close
     hf = h5py.File(wind_file, 'r')
     wind_data = hf.get('F')[:]                                                          #extract wind data
-    close(hf)
+    hf.close
 
     #parameters
     problem.parameters['f'] = f_0
