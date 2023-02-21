@@ -193,10 +193,10 @@ def run_sim(Ls,ns,p,solver_QG,strat_file,wind_file):
     problem.substitutions['b'] = "f*dz(psi)"
     
     #equations and b.c.'s
-    problem.add_equation("dt(Mzz) + 1j*N2*L(M)/2/f + nu*HD(Mzz) = -J(psi,Mzz) -1j*L(psi)*Mzz/2 + W*forc_zz") 
+    problem.add_equation("dt(Mzz) + 1j*N2*L(M)/2/f + nuM*HD(Mzz) = -J(psi,Mzz) -1j*L(psi)*Mzz/2 + W*forc_zz") 
     problem.add_equation("Mzz - dz(Mz) = 0")
     problem.add_equation("Mz - dz(M) = 0")
-    problem.add_equation("dt(q) + nu*HD(q)  = -J(psi,q)")
+    problem.add_equation("dt(q) + nuq*HD(q)  = -J(psi,q)")
     problem.add_equation("dt(b) + N2*w  + kappa*HD(b) = -J(psi,b)")
     problem.add_bc(" left(w) = 0", condition="(nx != 0)  or (ny != 0)")
     problem.add_bc("right(w) = 0", condition="(nx != 0)  or (ny != 0)")
