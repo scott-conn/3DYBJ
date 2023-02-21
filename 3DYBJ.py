@@ -119,7 +119,7 @@ def spin_up_QG(Ls,ns,init_file,event_file,Nt,time_step,f_0)
                
     return solver     
                
-def run_sim(Ls,ns,f_0,Hm,solver,event_file,Nt,Nw,time_step):
+def run_sim(Ls,ns,f_0,Hm,solver_QG,event_file,Nt,Nw,time_step):
     
     Lx, Ly, Lz = Ls                                                                     #length of each dimension
     nx, ny, nz = ns                                                                     #number of grid cells in each dimension
@@ -201,51 +201,19 @@ def run_sim(Ls,ns,f_0,Hm,solver,event_file,Nt,Nw,time_step):
     solver.stop_wall_time = np.inf #t_end in real life
     solver.stop_iteration = np.inf #number of iterations corresponding to t_end
 
-    #initial conditions - Mz(t=0)=0
-    z = domain.grid(2)
-    y = domain.grid(1)
-    x = domain.grid(0)
+    #initial conditions
     M = solver.state['M']
     Mz = solver.state['Mz']
     Mzz = solver.state['Mzz']
+    psi = solver.state['psi']
+    w = solver.state['w']
     M['g'] = 0+0j
     Mz['g'] = 0+0j
     Mzz['g'] = 0+0j
+    w['g'] = solver_QG.state['w']['g']
+    psi['g'] = solver_QG.state['psi']['g']
     
-    psi_init = solver.state['psi']
-    slices = domain.dist.grid_layout.slices(scales=1)                                           #take right part of psi array when in parallel
-    hf = h5py.File(init_file, 'r')  
-    psi_data = hf.get('psi')                                                                    #extract psi data
-    psi_init['g'] = psi_data[:,:,:][slices]
-    hf.close()
-    
-    # Need to solve for W_init using dt(P) --> Pt_init as a slack variable.
-    init_problem = de.LBVP(domain, variables=['Pt','w'])
-    init_problem.meta[:]['z']['dirichlet'] = True
-    init_problem.substitutions = problem.substitutions
-    init_problem.parameters    = problem.parameters
-    init_problem.parameters['psi'] = psi_init
-    init_problem.add_equation(" L(Pt) =  nu*HD(q)    - J(psi,q)")
-    init_problem.add_equation("f*dz(Pt) + N2*w  = J(psi,b) - kappa*HD(b)")
-    init_problem.add_bc(" left(W) =   0", condition="(nx != 0)  or (ny != 0)")
-    init_problem.add_bc("right(W)  = 0", condition="(nx != 0)  or (ny != 0)")
-    init_problem.add_bc("left(Pt) = 0", condition="(nx == 0) and (ny == 0)")
-    init_problem.add_bc("right(Pt) = 0", condition="(nx == 0) and (ny == 0)")
-
-    # Init solver
-    init_solver = init_problem.build_solver()
-    init_solver.solve()
-    
-    psi = solver.state['psi']
-    w = solver.state['w']
-    for g in [psi,w]: 
-        g.set_scales(domain.dealias)
-    psi['g'] = psi_init['g']
-    init_solver.state['w'].set_scales(domain.dealias)
-    w['g'] = init_solver.state['w']['g']
-
     #set up output files
-    
     #state variables
     state_file = "state" #output file name
     analysis = solver.evaluator.add_file_handler(state_file, iter=Nw)
